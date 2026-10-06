@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Liber</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="./img/icon.png">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body data-theme="dark">
+    <section id="auth" class="screen">
+        <div class="authCard">
+            <div class="quick">
+                <button type="button" class="ghost js-theme">🌗</button>
+                <button type="button" class="ghost js-lang"></button>
+            </div>
+            <img class="logo" alt="Liber" src="./img/icon.png" id="logo">
+            <h1>Liber</h1>
+
+            <div class="tabs">
+                <button type="button" class="active" data-tab="login" data-i18n="login"></button>
+                <button type="button" data-tab="register" data-i18n="register"></button>
+            </div>
+
+            <form id="loginForm">
+                <input type="email" name="email" required data-i18n-ph="email">
+                <input type="password" name="password" required data-i18n-ph="password">
+                <button class="primary" data-i18n="signIn"></button>
+            </form>
+
+            <form class="hidden" id="registerForm">
+                <label class="avatar-pick">
+                    <img id="avatarPreview" alt="">
+                    <input type="file" id="avatarInput" name="avatar" accept="image/*" hidden>
+                    <span data-i18n="chooseAvatar"></span>
+                </label>
+                <input type="text" name="username" required minlength="2" maxlength="20" data-i18n-ph="username">
+                <input type="email" name="email" required data-i18n-ph="email">
+                <input type="tel" name="phone" required data-i18n-ph="phone">
+                <input type="password" name="password" required minlength="9" data-i18n-ph="password">
+                <button class="primary" data-i18n="signUp"></button>
+            </form>
+            <p id="authError" class="error"></p>
+        </div>
+    </section>
+
+
+
+
+    <section id="app" class="hidden">
+        <aside id="sideBar">
+            <header class="me">
+                <img class="avatar" id="meAvatar" alt="">
+                <span id="meName"></span>
+                <button type="button" class="ghost" id="settingsBtn"><i class="fa-solid fa-sliders"></i></button>
+            </header>
+            <div class="actions">
+                <button type="button" id="newDm" data-i18n="newDm"></button>
+                <button type="button" id="newRoom" data-i18n="newRoom"></button>
+            </div>
+            <ul id="roomName"></ul>
+        </aside>
+
+        <main id="chat">
+            <header class="chatHead">
+                <button type="button" class="ghost" id="backBtn"></button>
+                <img id="roomAvatar" class="avatar" alt="">
+                <span id="roomName"></span>
+            </header>
+
+            <div id="message"></div>
+            <div id="emojiPanel" class="hidden">
+                <input type="search" name="" id="emojiSearch" data-i18n-ph="search">
+                <div id="emojiGrid"></div>
+            </div>
+            <form  id="composer">
+                <button type="button" class="ghost" id="emojiBtn">🙃</button>
+                <input type="text" name="" id="text" autocomplete="off" data-i18n-ph="typeMessage">
+                <input type="file" id="fileInput" accept="image/*" hidden>
+                <button type="button" class="ghost" id="attachBtn">📌</button>
+                <button type="button" class="ghost" id="voiceBtn">🎤</button>
+                <button type="button" class="ghost" id="circleBtn">⭕</button>
+                <button type="submit" class="send"></button>
+            </form>
+        </main>
+    </section>
+
+    <div id="circleRec" class="overlay hidden">
+        <div class="circleBox">
+            <video id="circlePreview" autoplay muted playsinline></video>
+            <div class="circleAction">
+                <button type="button" id="circleCancel" data-i18n="cancel"></button>
+                <button type="button" class="primary" id="circleSend" data-i18n="stopSend"></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="askModal" class="overlay hidden">
+        <form action="" id="askForm" class="modal">
+            <h3 id="askTitle"></h3>
+            <input type="text" name="" id="askInput" autocomplete="off" maxlength="30">
+            <div class="modalAction">
+                <button type="button" id="askCancel" data-i18n="cancel"></button>
+                <button class="primary" data-i18n="open"></button>
+            </div>
+        </form>
+    </div>
+
+    <div id="settingsModal" class="overlay hidden">
+        <div class="modal">
+            <h3 data-i18n="settings"></h3>
+            <label class="field">
+                <span data-i18n="theme"></span>
+                <select name="" id="themeSelect">
+                    <option value="dark" data-i18n="dark"></option>
+                    <option value="light" data-i18n="light"></option>
+                </select>
+            </label>
+
+            <label class="field">
+                <span data-i18n="language"></span>
+                <select name="" id="langSelect">
+                    <option value="uk">Українська</option>
+                    <option value="en">English</option>
+                </select>
+            </label>
+
+            <label class="field">
+                <span data-i18n="style"></span>
+                <select id="styleSelect">
+                    <option value="glass" data-i18n="styleGlass"></option>
+                    <option value="neon" data-i18n="styleNeon"></option>
+                    <option value="aurora" data-i18n="styleAurora"></option>
+                    <option value="solid" data-i18n="styleSolid"></option>
+                </select>
+            </label>
+
+            <div class="field">
+                <span data-i18n="accent"></span>
+                <div id="accentPicker">
+                    <button type="button" data-accent="blue"></button>
+                    <button type="button" data-accent="violet"></button>
+                    <button type="button" data-accent="green"></button>
+                    <button type="button" data-accent="pink"></button>
+                    <button type="button" data-accent="cyan"></button>
+                </div>
+            </div>
+
+            <div class="field">
+                <span data-i18n="background"></span>
+                <input type="file" id="bgInput" accept="image/*" hidden>
+                <div class="row">
+                    <button type="button" id="bgUpload" data-i18n="uploadBackground"></button>
+                    <button type="button" id="bgReset" data-i18n="resetBackground"></button>
+                </div>
+            </div>
+
+            <div class="modalActiob">
+                <button type="button" id="logoutBtn" data-i18n="logout"></button>
+                <button type="button" id="settingsClose" class="primary" data-i18n="close"></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./main.js"></script>
+</body>
+</html>
