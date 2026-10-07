@@ -35,7 +35,17 @@ const I18n = (() => {
       stopSend: "Зупинити й надіслати",
       general: "Загальний чат",
       dmTitle: "Нік користувача",
-      roomTitle: "Назва кімнати (створити або зайти)",
+      roomTitle: "Назва нової кімнати",
+      joinRoom: "Код",
+      joinTitle: "Код запрошення до кімнати",
+      inviteCode: "Скопіювати код запрошення",
+      leaveRoom: "Вийти з кімнати",
+      leaveConfirm: "Вийти з кімнати?",
+      codeCopied: "Код запрошення скопійовано: ",
+      long_password: "Пароль не довший за 72 символи",
+      too_many: "Забагато спроб, зачекайте трохи",
+      file_too_large: "Файл завеликий",
+      unauthorized: "Сеанс завершено, увійдіть знову",
       invalid_username: "Нік: 2–20 символів, літери, цифри, . _ -",
       invalid_email: "Некоректна пошта",
       invalid_phone: "Некоректний номер телефону",
@@ -85,7 +95,17 @@ const I18n = (() => {
       stopSend: "Stop and send",
       general: "General chat",
       dmTitle: "User nickname",
-      roomTitle: "Room name (create or join)",
+      roomTitle: "New room name",
+      joinRoom: "Code",
+      joinTitle: "Room invite code",
+      inviteCode: "Copy invite code",
+      leaveRoom: "Leave room",
+      leaveConfirm: "Leave this room?",
+      codeCopied: "Invite code copied: ",
+      long_password: "Password must be at most 72 characters",
+      too_many: "Too many attempts, please wait a bit",
+      file_too_large: "File is too large",
+      unauthorized: "Session ended, please log in again",
       invalid_username: "Nickname: 2–20 characters, letters, digits, . _ -",
       invalid_email: "Invalid email",
       invalid_phone: "Invalid phone number",
@@ -109,6 +129,9 @@ const I18n = (() => {
   const apply = () => {
     document.documentElement.lang = lang;
     $("[data-i18n]").each((i, el) => $(el).text(t($(el).attr("data-i18n"))));
+    $("[data-i18n-title]").each((i, el) =>
+      $(el).attr("title", t($(el).attr("data-i18n-title"))),
+    );
     $("[data-i18n-ph]").each((i, el) =>
       $(el).attr("placeholder", t($(el).attr("data-i18n-ph"))),
     );
@@ -132,10 +155,9 @@ const I18n = (() => {
 })();
 $(function () {
   const t = I18n.t;
-  const $roomList = $("#sideBar #roomName");
-  const $roomTitle = $(".chatHead #roomName");
+  const $roomList = $("#roomList");
+  const $roomTitle = $("#roomTitle");
 
-  const LOGO_MS = 3000;
   const CIRCLE_MAX_MS = 60000;
   const audioMimes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
   const videoMimes = ["video/webm;codecs=vp9,opus", "video/webm", "video/mp4"];
@@ -158,6 +180,9 @@ $(function () {
     active: null,
     unread: {},
     emojis: null,
+    oldestId: null,
+    hasMore: false,
+    loadingOlder: false,
   };
 
   const voice = { session: null };
@@ -175,11 +200,18 @@ $(function () {
     });
 
   const errorText = (xhr) =>
-    t((xhr.responseJSON && xhr.responseJSON.error) || "generic");
+    t((xhr && xhr.responseJSON && xhr.responseJSON.error) || "generic");
+
+  const toast = (text, isError = true) => {
+    const $item = $('<div class="toast">')
+      .toggleClass("error", isError)
+      .text(text)
+      .appendTo("#toasts");
+    setTimeout(() => $item.fadeOut(300, () => $item.remove()), 3500);
+  };
 
   const DEFAULT_AVATAR = "./img/default.png";
 
-  // letter = true — для груп і публічних кімнат (буква на кольоровому фоні)
   const avatarSrc = (name, avatar, letter = false) => {
     if (avatar) return avatar;
     if (!letter) return DEFAULT_AVATAR;
@@ -253,7 +285,10 @@ $(function () {
           ),
           $('<span class="room-name">').text(roomTitle(room)),
         );
-      if (unread) $item.append($('<span class="badge">').text(unread));
+      if (unread)
+        $item.append(
+          $('<span class="badge">').text(unread > 99 ? "99+" : unread),
+        );
       $list.append($item);
     });
   };
@@ -261,6 +296,9 @@ $(function () {
   const updateRoomHeader = () => {
     if (!state.active) return;
     $roomTitle.text(roomTitle(state.active));
+    const isGroup = state.active.type === "group";
+    $("#inviteBtn").toggleClass("hidden", !(isGroup && state.active.inviteCode));
+    $("#leaveBtn").toggleClass("hidden", !isGroup);
     $("#roomAvatar").attr(
       "src",
       avatarSrc(state.active.name, state.active.avatar, state.active.type !== "dm"),
@@ -309,33 +347,98 @@ $(function () {
       );
   };
 
+  const markRead = (roomId) => {
+    state.unread[roomId] = 0;
+    if (state.socket) state.socket.emit("read", roomId);
+  };
+
   const openRoom = async (id, reveal = true) => {
     state.active = state.rooms.find((room) => room.id === id);
-    state.unread[id] = 0;
+    if (!state.active) return;
     $("#emojiPanel").addClass("hidden");
     if (reveal) $("#app").addClass("chat-open");
     updateRoomHeader();
+    markRead(id);
     renderRooms();
 
-    const messages = await api("GET", `/rooms/${id}/messages`);
-    if (!state.active || state.active.id !== id) return;
-    $("#message").empty().append(messages.map(renderMessage));
-    scrollDown();
+    try {
+      const { messages, hasMore } = await api("GET", `/rooms/${id}/messages`);
+      if (!state.active || state.active.id !== id) return;
+      state.hasMore = hasMore;
+      state.oldestId = messages.length ? messages[0].id : null;
+      $("#message").empty().append(messages.map(renderMessage));
+      scrollDown();
+    } catch (xhr) {
+      toast(errorText(xhr));
+    }
+  };
+  const loadOlder = async () => {
+    if (state.loadingOlder || !state.hasMore || !state.oldestId || !state.active)
+      return;
+    state.loadingOlder = true;
+    const roomId = state.active.id;
+    try {
+      const { messages, hasMore } = await api(
+        "GET",
+        `/rooms/${roomId}/messages?before=${state.oldestId}`,
+      );
+      if (!state.active || state.active.id !== roomId) return;
+      const box = $("#message")[0];
+      const before = box.scrollHeight;
+      $("#message").prepend(messages.map(renderMessage));
+      box.scrollTop += box.scrollHeight - before;
+      state.hasMore = hasMore;
+      if (messages.length) state.oldestId = messages[0].id;
+    } catch (xhr) {
+      toast(errorText(xhr));
+    } finally {
+      state.loadingOlder = false;
+    }
   };
 
   const loadRooms = async () => {
-    state.rooms = await api("GET", "/rooms");
+    try {
+      state.rooms = await api("GET", "/rooms");
+    } catch (xhr) {
+      toast(errorText(xhr));
+      return;
+    }
+    state.unread = {};
+    state.rooms.forEach((room) => (state.unread[room.id] = room.unread || 0));
     renderRooms();
     await openRoom(state.rooms[0].id, false);
   };
 
+  const bumpUnread = (roomId) => {
+    state.unread[roomId] = (state.unread[roomId] || 0) + 1;
+    renderRooms();
+  };
+
   const onMessage = (message) => {
+    const mine = message.author.id === state.me.id;
     if (state.active && state.active.id === message.room) {
       $("#message").append(renderMessage(message));
       scrollDown();
+      if (document.hidden) {
+        if (!mine) bumpUnread(message.room);
+      } else {
+        markRead(message.room);
+        renderRooms();
+      }
       return;
     }
-    state.unread[message.room] = (state.unread[message.room] || 0) + 1;
+    if (!mine) bumpUnread(message.room);
+  };
+
+  const onRoomLeft = (roomId) => {
+    state.rooms = state.rooms.filter((room) => room.id !== roomId);
+    delete state.unread[roomId];
+    if (state.active && state.active.id === roomId) {
+      state.active = null;
+      $("#message").empty();
+      $("#app").removeClass("chat-open");
+      if (state.rooms.length) openRoom(state.rooms[0].id, false);
+    }
     renderRooms();
   };
 
@@ -346,12 +449,13 @@ $(function () {
     });
     state.socket.on("message", onMessage);
     state.socket.on("room:new", addRoom);
+    state.socket.on("room:left", onRoomLeft);
   };
 
   const logout = () => {
     localStorage.removeItem("liber.token");
     if (state.socket) state.socket.disconnect();
-    location.reload();
+    api("POST", "/logout").always(() => location.reload());
   };
 
   const enterApp = ({ token, user }) => {
@@ -368,51 +472,25 @@ $(function () {
 
   const showAuthError = (xhr) => $("#authError").text(errorText(xhr));
 
-  const LOGO_STATIC = "/img/icon.png";
-  const LOGO_GIF = "/img/icongf.gif";
-
-  const freezeLogo = () => {
-    const img = $("#logo")[0];
-    if (!img.naturalWidth) return;
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext("2d").drawImage(img, 0, 0);
-      $("#logo").attr("src", canvas.toDataURL("image/png"));
-    } catch {
-      $("#logo").attr("src", LOGO_STATIC);
-    }
+  const send = (payload, roomId = state.active && state.active.id) => {
+    if (roomId) state.socket.emit("message", { roomId, ...payload });
   };
 
-  // Спочатку підвантажуємо гіф окремо: якщо файлу нема — лишається статична іконка
-  const playLogoOnce = () => {
-    const gif = new Image();
-    gif.onload = () => {
-      $("#logo").attr("src", gif.src);
-      setTimeout(freezeLogo, LOGO_MS);
-    };
-    gif.onerror = () => $("#logo").attr("src", LOGO_STATIC);
-    gif.src = `${LOGO_GIF}?${Date.now()}`;
-  };
-
-  const send = (payload) => {
-    if (state.active)
-      state.socket.emit("message", { roomId: state.active.id, ...payload });
-  };
-
-  const uploadFile = async (file, name) => {
+  const uploadFile = async (file, name, query) => {
     const form = new FormData();
     form.append("file", file, name);
-    const { url } = await api("POST", "/upload", form, true);
+    const { url } = await api("POST", `/upload?${query}`, form, true);
     return url;
   };
 
   const uploadAndSend = async (kind, file, name) => {
+    if (!state.active) return;
+    const roomId = state.active.id;
     try {
-      send({ kind, file: await uploadFile(file, name) });
-    } catch {
-      alert(t("upload_failed"));
+      const url = await uploadFile(file, name, `purpose=message&room=${roomId}`);
+      send({ kind, file: url }, roomId);
+    } catch (xhr) {
+      toast(xhr && xhr.responseJSON ? errorText(xhr) : t("upload_failed"));
     }
   };
 
@@ -567,7 +645,7 @@ $(function () {
     try {
       await action(value);
     } catch (xhr) {
-      alert(errorText(xhr));
+      toast(errorText(xhr));
     }
   };
 
@@ -617,6 +695,48 @@ $(function () {
   });
 
   $("#backBtn").on("click", () => $("#app").removeClass("chat-open"));
+
+  $("#message").on("scroll", function () {
+    if (this.scrollTop < 60) loadOlder();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.active) {
+      markRead(state.active.id);
+      renderRooms();
+    }
+  });
+
+  $("#joinRoom").on("click", () =>
+    ask(
+      "joinTitle",
+      safely(async (code) => {
+        const room = await api("POST", "/rooms/join", { code });
+        addRoom(room);
+        openRoom(room.id);
+      }),
+    ),
+  );
+
+  $("#inviteBtn").on("click", async () => {
+    if (!state.active || !state.active.inviteCode) return;
+    const code = state.active.inviteCode;
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+    }
+    toast(t("codeCopied") + code, false);
+  });
+
+  $("#leaveBtn").on("click", async () => {
+    if (!state.active || state.active.type !== "group") return;
+    if (!confirm(t("leaveConfirm"))) return;
+    try {
+      await api("POST", `/rooms/${state.active.id}/leave`);
+    } catch (xhr) {
+      toast(errorText(xhr));
+    }
+  });
 
   $("#newDm").on("click", () =>
     ask(
@@ -693,7 +813,7 @@ $(function () {
       voice.session = await startRecording({ audio: true }, audioMimes);
       $(this).addClass("recording");
     } catch {
-      alert(t("mic_denied"));
+      toast(t("mic_denied"));
     }
   });
 
@@ -704,7 +824,7 @@ $(function () {
         videoMimes,
       );
     } catch {
-      alert(t("mic_denied"));
+      toast(t("mic_denied"));
       return;
     }
     $("#circlePreview")[0].srcObject = circle.session.stream;
@@ -752,9 +872,9 @@ $(function () {
     this.value = "";
     if (!file) return;
     try {
-      applyBackground(await uploadFile(file, file.name));
+      applyBackground(await uploadFile(file, file.name, "purpose=bg"));
     } catch {
-      alert(t("upload_failed"));
+      toast(t("upload_failed"));
     }
   });
 
@@ -771,9 +891,6 @@ $(function () {
       .catch(() => {
         localStorage.removeItem("liber.token");
         state.token = null;
-        playLogoOnce();
       });
-  } else {
-    playLogoOnce();
   }
 });

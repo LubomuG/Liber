@@ -1,12 +1,13 @@
 <!doctype html>
-<html>
+<html lang="uk">
 <head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Liber</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="./img/icon.png">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="/vendor/jquery/jquery.min.js"></script>
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
 </head>
 
 <body data-theme="dark">
@@ -39,7 +40,7 @@
                 <input type="text" name="username" required minlength="2" maxlength="20" data-i18n-ph="username">
                 <input type="email" name="email" required data-i18n-ph="email">
                 <input type="tel" name="phone" required data-i18n-ph="phone">
-                <input type="password" name="password" required minlength="9" data-i18n-ph="password">
+                <input type="password" name="password" required minlength="9" maxlength="72" data-i18n-ph="password">
                 <button class="primary" data-i18n="signUp"></button>
             </form>
             <p id="authError" class="error"></p>
@@ -59,15 +60,18 @@
             <div class="actions">
                 <button type="button" id="newDm" data-i18n="newDm"></button>
                 <button type="button" id="newRoom" data-i18n="newRoom"></button>
+                <button type="button" id="joinRoom" data-i18n="joinRoom"></button>
             </div>
-            <ul id="roomName"></ul>
+            <ul id="roomList"></ul>
         </aside>
 
         <main id="chat">
             <header class="chatHead">
                 <button type="button" class="ghost" id="backBtn"></button>
                 <img id="roomAvatar" class="avatar" alt="">
-                <span id="roomName"></span>
+                <span id="roomTitle"></span>
+                <button type="button" class="ghost hidden" id="inviteBtn" data-i18n-title="inviteCode"><i class="fa-solid fa-user-plus"></i></button>
+                <button type="button" class="ghost hidden" id="leaveBtn" data-i18n-title="leaveRoom"><i class="fa-solid fa-right-from-bracket"></i></button>
             </header>
 
             <div id="message"></div>
@@ -157,12 +161,14 @@
                 </div>
             </div>
 
-            <div class="modalActiob">
+            <div class="modalAction">
                 <button type="button" id="logoutBtn" data-i18n="logout"></button>
                 <button type="button" id="settingsClose" class="primary" data-i18n="close"></button>
             </div>
         </div>
     </div>
+
+    <div id="toasts" aria-live="polite"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="./main.js"></script>
