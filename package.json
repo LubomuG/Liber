@@ -1,8 +1,5 @@
 {
-  "name": "liber",
-  "version": "1.0.0",
-  "main": "app.js",
-  "scripts": {
+   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
@@ -10,6 +7,7 @@
     "crypto": "^1.0.1",
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
     "fs": "^0.0.1-security",
     "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.3",
